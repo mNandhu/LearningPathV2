@@ -10,4 +10,7 @@ wheels/
 .venv
 
 # Project files
-data/
+data/*
+!data/fix_data.py
+
+logs/

@@ -11,14 +11,14 @@ import time
 import logging  # Use logging module
 import gc  # For garbage collection
 
-import utils  # Import functions from utils.py
+import utils.utils as utils  # Import functions from utils.py
 
 # --- Configuration ---
 # File Paths
-ENTITY_CONCEPT_FILE = "data/MOOCCube/entities/concept.json"
-RELATION_FILE = "data/MOOCCube/relations/prerequisite-dependency.json"
-CONCEPT_INFO_FILE = "data/MOOCCube/additional_information/concept_information.json"
-LOG_FILE = "training.log"  # File to save logs
+ENTITY_CONCEPT_FILE = "data/MOOCCube/entities/concept_formatted.json"
+RELATION_FILE = "data/MOOCCube/relations/prerequisite-dependency_formatted.json"
+CONCEPT_INFO_FILE = "data/MOOCCube/additional_information/concept_infomation_formatted.json"
+LOG_FILE = "logs/training.log"  # File to save logs
 CHECKPOINT_PATH = "checkpoints/best_model.pt"
 
 # Model & Embedding
