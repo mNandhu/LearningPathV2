@@ -223,9 +223,27 @@ def generate_node_features(
 
     logging.info(f"Generating node embeddings (Batch Size: {batch_size})...")
     start_time = time.time()
+    
+    # Pre-validate input texts to avoid encoding errors
+    logging.info("Pre-validating text inputs...")
+    validated_texts = []
+    for i, text in enumerate(texts_to_embed):
+        # Ensure text is a string
+        if not isinstance(text, str):
+            logging.warning(f"Non-string text at index {i} (type: {type(text).__name__}). Converting to string.")
+            text = str(text) if text is not None else ""
+        
+        # Check for potential tuple-like strings (based on error pattern)
+        if text.startswith("(") and "," in text and not text.strip().endswith(")"):
+            logging.warning(f"Potentially malformed tuple-like string at index {i}: '{text[:50]}...'")
+            # Clean up or repair if needed
+            text = text.replace("(", "").replace(")", "")
+            
+        validated_texts.append(text)
+    
     try:
         embeddings_np = embedding_model.encode(
-            texts_to_embed, show_progress_bar=True, batch_size=batch_size
+            validated_texts, show_progress_bar=True, batch_size=batch_size
         )
     except Exception as e:
         logging.error(f"Error during sentence embedding encoding: {e}", exc_info=True)

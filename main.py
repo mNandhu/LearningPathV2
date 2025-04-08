@@ -10,7 +10,7 @@ import random
 import time
 import logging  # Use logging module
 import gc  # For garbage collection
-
+import os
 import utils.utils as utils  # Import functions from utils.py
 
 # --- Configuration ---
@@ -50,6 +50,14 @@ EARLY_STOPPING_METRIC = "auc"  # Metric to monitor for scheduler/stopping ('auc'
 # Remove previous handlers if any
 for handler in logging.root.handlers[:]:
     logging.root.removeHandler(handler)
+
+# Ensure log path exists
+if not os.path.exists(os.path.dirname(LOG_FILE)):
+    try:
+        os.makedirs(os.path.dirname(LOG_FILE))
+    except OSError as e:
+        logging.error(f"Failed to create log directory: {e}", exc_info=True)
+        raise
 # Configure logging to file and console
 logging.basicConfig(
     level=logging.INFO,
