@@ -159,11 +159,11 @@ def generate_node_features(
         if name:
             text = info.get("wiki_abstract")
             if not text:
-                 if info.get("baidu_snippet_zh"):
-                    text = ''
+                if info.get("baidu_snippet_zh"):
+                    text = ""
                     for item in info["baidu_snippet_zh"]:
-                        if item.get('snippet'):
-                            text += item.get('title') + item['snippet']
+                        if item.get("snippet"):
+                            text += item.get("title") + item["snippet"]
             if text:
                 concept_text_lookup[name] = text
 
@@ -229,19 +229,21 @@ def generate_node_features(
 
     logging.info(f"Generating node embeddings (Batch Size: {batch_size})...")
     start_time = time.time()
-    
+
     # Pre-validate input texts to avoid encoding errors
     logging.info("Pre-validating text inputs...")
     validated_texts = []
     for i, text in enumerate(texts_to_embed):
         # Ensure text is a string
         if not isinstance(text, str):
-            logging.warning(f"Non-string text at index {i} (type: {type(text).__name__}). Converting to string.")
+            logging.warning(
+                f"Non-string text at index {i} (type: {type(text).__name__}). Converting to string."
+            )
             print(text)
             text = str(text) if text is not None else ""
-            
+
         validated_texts.append(text)
-    
+
     try:
         embeddings_np = embedding_model.encode(
             validated_texts, show_progress_bar=True, batch_size=batch_size
