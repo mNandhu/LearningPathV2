@@ -14,3 +14,4 @@ data/*
 !data/fix_data.py
 
 logs/
+checkpoints/

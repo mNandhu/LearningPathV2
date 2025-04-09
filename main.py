@@ -241,7 +241,7 @@ if __name__ == "__main__":
     # ---
 
     # 5. Setup Device, Models, Optimizer, Criterion, Scheduler
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
     logging.info(f"\nUsing device: {device}")
 
     model = GAT(

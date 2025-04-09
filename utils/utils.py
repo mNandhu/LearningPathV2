@@ -157,7 +157,13 @@ def generate_node_features(
     for info in concept_info_data:
         name = info.get("name")
         if name:
-            text = info.get("wiki_abstract") or info.get("baidu_snippet_zh")
+            text = info.get("wiki_abstract")
+            if not text:
+                 if info.get("baidu_snippet_zh"):
+                    text = ''
+                    for item in info["baidu_snippet_zh"]:
+                        if item.get('snippet'):
+                            text += item.get('title') + item['snippet']
             if text:
                 concept_text_lookup[name] = text
 
@@ -208,7 +214,7 @@ def generate_node_features(
     start_time = time.time()
     try:
         # Consider specifying cache folder if needed: cache_folder='/path/to/cache'
-        embedding_model = SentenceTransformer(model_name)
+        embedding_model = SentenceTransformer(model_name, device="cuda:1")
     except Exception as e:
         logging.error(
             f"Error loading Sentence Transformer model '{model_name}': {e}",
@@ -231,13 +237,8 @@ def generate_node_features(
         # Ensure text is a string
         if not isinstance(text, str):
             logging.warning(f"Non-string text at index {i} (type: {type(text).__name__}). Converting to string.")
+            print(text)
             text = str(text) if text is not None else ""
-        
-        # Check for potential tuple-like strings (based on error pattern)
-        if text.startswith("(") and "," in text and not text.strip().endswith(")"):
-            logging.warning(f"Potentially malformed tuple-like string at index {i}: '{text[:50]}...'")
-            # Clean up or repair if needed
-            text = text.replace("(", "").replace(")", "")
             
         validated_texts.append(text)
     
@@ -355,7 +356,7 @@ def load_checkpoint(filepath, model, predictor, optimizer=None):
     try:
         # Load checkpoint onto the same device model is on
         device = next(model.parameters()).device
-        checkpoint = torch.load(filepath, map_location=device)
+        checkpoint = torch.load(filepath, map_location=device, weights_only=False)
 
         model.load_state_dict(checkpoint["model_state_dict"])
         predictor.load_state_dict(checkpoint["predictor_state_dict"])
