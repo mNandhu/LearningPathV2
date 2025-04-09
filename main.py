@@ -22,6 +22,20 @@ except ImportError:
     )
     exit()
 
+ITER_FILE = "logs/iter.txt"
+if os.path.exists(ITER_FILE):
+    with open(ITER_FILE, "r") as f:
+        try:
+            iter_num = int(f.read().strip())
+        except ValueError:
+            iter_num = 1
+else:
+    iter_num = 100
+
+with open(ITER_FILE, "w") as f:
+    f.write(str(iter_num + 1))
+
+ITER = str(iter_num)
 
 # --- Configuration ---
 # File Paths
@@ -30,8 +44,8 @@ RELATION_FILE = "data/MOOCCube/relations/prerequisite-dependency_formatted.json"
 CONCEPT_INFO_FILE = (
     "data/MOOCCube/additional_information/concept_infomation_formatted.json"
 )
-LOG_FILE = "logs/training.log"
-CHECKPOINT_PATH = "checkpoints/best_model.pt"
+LOG_FILE = f"logs/training{ITER}.log"
+CHECKPOINT_PATH = f"checkpoints/best_model{ITER}.pt"
 CACHE_DIR = "cache"  # <-- Directory for cached data
 CACHE_FILE_PATH = os.path.join(
     CACHE_DIR, "processed_data_split.pt"
@@ -39,16 +53,16 @@ CACHE_FILE_PATH = os.path.join(
 
 # Model & Embedding
 EMBEDDING_MODEL_NAME = "LaBSE"
-EMBEDDING_BATCH_SIZE = 128  # Batch size for sentence transformer encoding
+EMBEDDING_BATCH_SIZE = 1024  # Batch size for sentence transformer encoding
 HIDDEN_CHANNELS = 128
 OUT_CHANNELS = 64
-GAT_HEADS = 4
-GAT_DROPOUT = 0.6  # Dropout rate for GAT layers
-PREDICTOR_DROPOUT = 0.5  # Dropout rate for predictor MLP
+GAT_HEADS = 2
+GAT_DROPOUT = 0.65  # Dropout rate for GAT layers
+PREDICTOR_DROPOUT = 0.55  # Dropout rate for predictor MLP
 
 # Training Process
 LEARNING_RATE = 0.001  # <-- Using the adjusted LR from previous recommendation
-WEIGHT_DECAY = 5e-4  # <-- Using the adjusted WD from previous recommendation
+WEIGHT_DECAY = 0.01  # <-- Using the adjusted WD from previous recommendation
 EPOCHS = 300
 SEED = 42
 VAL_RATIO = 0.1
@@ -77,6 +91,37 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s",
     handlers=[logging.FileHandler(LOG_FILE, mode="w"), logging.StreamHandler()],
 )
+
+# Log all the configuration parameters
+logging.info("Configuration Parameters:")
+logging.info(f"  ENTITY_CONCEPT_FILE: {ENTITY_CONCEPT_FILE}")
+logging.info(f"  RELATION_FILE: {RELATION_FILE}")
+logging.info(f"  CONCEPT_INFO_FILE: {CONCEPT_INFO_FILE}")
+logging.info(f"  LOG_FILE: {LOG_FILE}")
+logging.info(f"  CHECKPOINT_PATH: {CHECKPOINT_PATH}")
+logging.info(f"  CACHE_DIR: {CACHE_DIR}")
+logging.info(f"  CACHE_FILE_PATH: {CACHE_FILE_PATH}")
+logging.info(f"  EMBEDDING_MODEL_NAME: {EMBEDDING_MODEL_NAME}")
+logging.info(f"  EMBEDDING_BATCH_SIZE: {EMBEDDING_BATCH_SIZE}")
+logging.info(f"  HIDDEN_CHANNELS: {HIDDEN_CHANNELS}")
+logging.info(f"  OUT_CHANNELS: {OUT_CHANNELS}")
+logging.info(f"  GAT_HEADS: {GAT_HEADS}")
+logging.info(f"  GAT_DROPOUT: {GAT_DROPOUT}")
+logging.info(f"  PREDICTOR_DROPOUT: {PREDICTOR_DROPOUT}")
+logging.info(f"  LEARNING_RATE: {LEARNING_RATE}")
+logging.info(f"  WEIGHT_DECAY: {WEIGHT_DECAY}")
+logging.info(f"  EPOCHS: {EPOCHS}")
+logging.info(f"  SEED: {SEED}")
+logging.info(f"  VAL_RATIO: {VAL_RATIO}")
+logging.info(f"  TEST_RATIO: {TEST_RATIO}")
+logging.info(f"  EVAL_EVERY: {EVAL_EVERY}")
+logging.info(f"  NEG_SAMPLING_RATIO: {NEG_SAMPLING_RATIO}")
+logging.info(f"  LR_SCHEDULER_FACTOR: {LR_SCHEDULER_FACTOR}")
+logging.info(f"  LR_SCHEDULER_PATIENCE: {LR_SCHEDULER_PATIENCE}")
+logging.info(f"  EARLY_STOPPING_PATIENCE: {EARLY_STOPPING_PATIENCE}")
+logging.info(f"  EARLY_STOPPING_METRIC: {EARLY_STOPPING_METRIC}")
+logging.info(f"  ITER: {ITER}")
+
 logging.info("--- Starting New Training Run ---")
 
 
@@ -202,7 +247,7 @@ if __name__ == "__main__":
             logging.info(
                 f"Attempting to load processed data from cache: {CACHE_FILE_PATH}"
             )
-            data = torch.load(CACHE_FILE_PATH)
+            data = torch.load(CACHE_FILE_PATH, weights_only=False)
             # Verify essential attributes exist
             if (
                 hasattr(data, "x")
