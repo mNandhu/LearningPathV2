@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from main import GATConv
+from torch_geometric.nn import GATConv
+# from utils.custom import GATConv
 from sentence_transformers import SentenceTransformer
 import numpy as np
 import random
@@ -79,8 +80,8 @@ class LinkPredictor(nn.Module):
     def __init__(self, in_channels, dropout):
         super().__init__()
         self.dropout_rate = dropout
-        self.lin1 = nn.Linear(2 * in_channels, 256)
-        self.lin2 = nn.Linear(256, 1)
+        self.lin1 = nn.Linear(2 * in_channels, 128)
+        self.lin2 = nn.Linear(128, 1)
 
     def forward(self, z_src, z_dst):
         x = torch.cat([z_src, z_dst], dim=-1)
@@ -127,30 +128,24 @@ custom_candidate_edges = [
     ("discrete_math", "data_structures"),      # Very common prereq
     ("calculus", "linear_algebra"),            # Common math sequence
 
-    # --- Expected Medium/High (Strongly Related / Tool Usage) ---
+    # --- Expected Medium/High ---
     ("data_structures", "machine_learning"),     # Should be reasonably high
 
     # --- Expected Medium (Plausible but less direct) ---
-    ("classical_mechanics", "linear_algebra"), # LA used in advanced mechanics
+    ("classical_mechanics", "linear_algebra"),
 
     # --- Expected Low (Reverse Directions) ---
     ("algorithms", "data_structures"),
     ("machine_learning", "statistics"),
-    ("evolution", "genetics"),                  # Using Evolution ID which is NOT in concepts - GOOD TEST CASE
+    ("evolution", "genetics"),             
     ("classical_mechanics", "calculus"),
 
     # --- Expected Very Low (Clearly Unrelated Domains) ---
-    ("ancient_greece", "calculus"),
-    ("impressionism", "intro_python"),
-    ("organic_chemistry", "data_structures"),
-    ("french_language", "machine_learning"),
     ("music_theory", "algorithms"),
     ("world_war_1", "genetics"),
     ("macroeconomics", "molecular_biology"),
 
-    # --- Testing Tool Usage vs Domain Knowledge ---
-    ("intro_python", "statistics"),             # Python used for stats, but not a prereq for the theory
-    ("intro_python", "macroeconomics"),         # Python used for econ modeling, weak prereq link
+    ("intro_python", "statistics"),
 ]
 
 # --- Main Inference Execution ---
