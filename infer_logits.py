@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.nn import GATConv
+from main import GATConv
 from sentence_transformers import SentenceTransformer
 import numpy as np
 import random
