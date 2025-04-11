@@ -12,6 +12,10 @@ wheels/
 # Project files
 data/*
 !data/fix_data.py
+!data/data_wiki_augument.py
+!data/testing.json
+!data/output_testing_en.json
+!data/output_testing_zh.json
 
 logs/
 checkpoints/

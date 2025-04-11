@@ -1,4 +1,3 @@
-# infer_logits.py (Modified version of infer.py)
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -9,36 +8,40 @@ import random
 import logging
 import os
 import gc
+import json
 
 
-ITER_FILE = "logs/margin_iter.txt"
+ITER_FILE = "logs/iter.txt"
 if os.path.exists(ITER_FILE):
     with open(ITER_FILE, "r") as f:
         try:
             iter_num = int(f.read().strip())
         except ValueError:
-            iter_num = 1
+            iter_num = 2
 else:
-    iter_num = 6
+    iter_num = 2
 
 ITER = str(iter_num - 1)
-
+# ITER = 8
+LOG_FILE = f"logs/training{ITER}.log"
 # --- Configuration (MUST MATCH TRAINING CONFIGURATION) ---
-CHECKPOINT_PATH = f"checkpoints/best_model_marginloss{ITER}.pt"
+CHECKPOINT_PATH = f"checkpoints/best_model{ITER}.pt"
 EMBEDDING_MODEL_NAME = "LaBSE"
+
 HIDDEN_CHANNELS = 128
 OUT_CHANNELS = 64
 GAT_HEADS = 2
-GAT_DROPOUT = 0.65
-PREDICTOR_DROPOUT = 0.55
+GAT_DROPOUT = 0.65  # Dropout rate for GAT layers
+PREDICTOR_DROPOUT = 0.55  # Dropout rate for predictor MLP
+
 SEED = 42
-DEVICE_PREFERENCE = "cuda"
+DEVICE_PREFERENCE = "cuda:1"
 
 # --- Setup Logging ---
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s",
-    handlers=[logging.StreamHandler()],
+    handlers=[logging.FileHandler(LOG_FILE, mode="a"),logging.StreamHandler()],
 )
 
 # --- Set Seed ---
@@ -49,13 +52,13 @@ if torch.cuda.is_available():
     torch.cuda.manual_seed_all(SEED)
 
 
-# --- Model Definitions (Copied from main.py) ---
+# --- Model Definitions ---
 class GAT(nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels, heads, dropout):
         super().__init__()
         self.dropout_rate = dropout
-        self.conv1 = GATConv(in_channels, hidden_channels, heads=heads, dropout=dropout)
-        self.conv2 = GATConv(
+        self.gat_conv1 = GATConv(in_channels, hidden_channels, heads=heads, dropout=dropout)
+        self.gat_conv2 = GATConv(
             hidden_channels * heads,
             out_channels,
             heads=1,
@@ -65,10 +68,10 @@ class GAT(nn.Module):
 
     def forward(self, x, edge_index):
         x = F.dropout(x, p=self.dropout_rate, training=self.training)
-        x = self.conv1(x, edge_index)
+        x = self.gat_conv1(x, edge_index)
         x = F.elu(x)
         x = F.dropout(x, p=self.dropout_rate, training=self.training)
-        x = self.conv2(x, edge_index)
+        x = self.gat_conv2(x, edge_index)
         return x
 
 
@@ -76,8 +79,8 @@ class LinkPredictor(nn.Module):
     def __init__(self, in_channels, dropout):
         super().__init__()
         self.dropout_rate = dropout
-        self.lin1 = nn.Linear(2 * in_channels, 128)
-        self.lin2 = nn.Linear(128, 1)
+        self.lin1 = nn.Linear(2 * in_channels, 256)
+        self.lin2 = nn.Linear(256, 1)
 
     def forward(self, z_src, z_dst):
         x = torch.cat([z_src, z_dst], dim=-1)
@@ -88,155 +91,66 @@ class LinkPredictor(nn.Module):
 
 
 # --- Custom Data Definition ---
-custom_concepts = [
-    # --- Core CS ---
-    {
-        "id": "intro_python",
-        "name": "Introduction to Python",
-        "text": "Basic syntax, variables, data types like integers, strings, lists in Python.",
-    },
-    {
-        "id": "python_loops",
-        "name": "Python Loops",
-        "text": "How to use for and while loops in Python for iteration. Loop control statements like break and continue.",
-    },
-    {
-        "id": "python_functions",
-        "name": "Python Functions",
-        "text": "Defining and calling functions in Python. Arguments, return values, scope.",
-    },
-    {
-        "id": "data_structures",
-        "name": "Data Structures",
-        "text": "Overview of common data structures like arrays, linked lists, stacks, queues, trees, and graphs. Focus on abstract concepts.",
-    },
-    {
-        "id": "algorithms",
-        "name": "Algorithms Analysis",
-        "text": "Analyzing algorithm efficiency using Big O notation. Time and space complexity. Asymptotic analysis.",
-    },
-    {
-        "id": "recursion",
-        "name": "Recursion",
-        "text": "Understanding recursive functions and how they solve problems by breaking them down. Base cases and recursive steps. Relation to stack.",
-    },
-    # --- Related CS / Math ---
-    {
-        "id": "discrete_math",
-        "name": "Discrete Mathematics",
-        "text": "Mathematical structures that are fundamentally discrete rather than continuous. Includes logic, set theory, graph theory, combinatorics.",
-    },
-    {
-        "id": "linear_algebra",
-        "name": "Linear Algebra",
-        "text": "Branch of mathematics concerning vector spaces and linear mappings between such spaces. Includes matrices, vectors, determinants.",
-    },
-    {
-        "id": "machine_learning",
-        "name": "Machine Learning Basics",
-        "text": "Introduction to machine learning concepts. Supervised learning, unsupervised learning, regression, classification.",
-    },
-    # --- Unrelated ---
-    {
-        "id": "art",
-        "name": "Art History",
-        "text": "The academic study of the history and development of painting, sculpture, and the other visual arts.",
-    },
-    {
-        "id": "cooking",
-        "name": "Basic Cooking Techniques",
-        "text": "Fundamental skills for preparing food, such as chopping, sautéing, boiling, baking. Understanding heat and ingredients.",
-    },
-    {
-        "id": "philosophy",
-        "name": "Introduction to Philosophy",
-        "text": "Exploring fundamental questions about existence, knowledge, values, reason, mind, and language. Major branches like metaphysics, epistemology, ethics.",
-    },
-    # --- Semantically Similar / Confusable ---
-    {
-        "id": "python_syntax",
-        "name": "Python Syntax Details",
-        "text": "Specific rules governing the structure of well-formed Python programs. Indentation, keywords, operators, comments.",
-    },  # Similar to intro_python
-    {
-        "id": "iteration_concepts",
-        "name": "Iteration Concepts",
-        "text": "General principles of repeating processes in programming. Loops, iterators, generators as abstract concepts.",
-    },  # Similar to python_loops
-    {
-        "id": "complexity_theory",
-        "name": "Computational Complexity Theory",
-        "text": "Focuses on classifying computational problems according to their inherent difficulty, and relating those classes to each other. P vs NP problem.",
-    },  # More advanced than algorithms analysis
-]
+concepts_path = "data/output_testing_zh.json"
+logging.info(f"Loading custom concepts from {concepts_path}...")
+with open(concepts_path, "r") as f:
+    custom_concepts = json.load(f)
+
 
 # Define KNOWN prerequisite relationships *within this expanded custom set*
-# Added a few more plausible links for better context graph
+# --- Custom Data Definition (Revised for Presentation) ---
+
+
+# Define KNOWN prerequisite relationships *within this custom set*
+# Refined set based on the new concepts
 custom_existing_edges = [
-    ("intro_python", "python_loops"),
-    ("intro_python", "python_functions"),
-    ("intro_python", "python_syntax"),  # Syntax is part of intro
-    ("python_loops", "python_functions"),
-    (
-        "python_loops",
-        "iteration_concepts",
-    ),  # Specific loop knowledge informs general concept
-    ("data_structures", "algorithms"),
-    ("discrete_math", "data_structures"),  # Often a prereq
-    ("discrete_math", "algorithms"),  # Often a prereq
-    ("python_functions", "recursion"),
-    ("algorithms", "complexity_theory"),  # Analysis often precedes deeper theory
-    ("linear_algebra", "machine_learning"),  # Foundational math for ML
-    ("intro_python", "machine_learning"),  # Need programming for ML
+    ("intro_python", "data_structures"),
+    ("data_structures", "algorithms"),          # Added standard CS link
+    ("calculus", "classical_mechanics"),
+    ("discrete_math", "algorithms"),           # Added standard CS link
+    ("probability", "statistics"),             # Added standard Math link
+    ("probability", "machine_learning"),       # Added standard ML link
+    ("statistics", "machine_learning"),        # Added standard ML link
+    ("statistics", "macroeconomics"),        # Added standard ML link
+    ("molecular_biology", "genetics"),         # Added standard Bio link
+    ("linear_algebra", "machine_learning"),
+    ("intro_python", "machine_learning"),
+    ("genetics", "molecular_biology"),         # Plausible Bio link
+    # Keep LA -> DS from before
+    ("linear_algebra", "data_structures"),
 ]
 
-# Define the CANDIDATE edges for prediction (More variety)
+# Define the CANDIDATE edges for presentation (Handpicked for clarity)
 custom_candidate_edges = [
-    # --- Expected High ---
-    ("intro_python", "data_structures"),
-    ("discrete_math", "recursion"),  # Graph theory/combinatorics can relate
-    ("intro_python", "python_syntax"),  # Should be very high, almost self-evident
-    # --- Expected Medium/High ---
-    ("data_structures", "machine_learning"),  # DS knowledge helps in ML
-    ("python_functions", "machine_learning"),  # Need functions for ML implementation
-    (
-        "iteration_concepts",
-        "algorithms",
-    ),  # General iteration understanding helps algo design
-    # --- Expected Medium/Low ---
-    ("python_syntax", "data_structures"),  # Syntax alone isn't enough for DS concepts
-    ("python_loops", "algorithms"),
-    ("python_functions", "algorithms"),
-    ("data_structures", "recursion"),
-    ("algorithms", "recursion"),
-    (
-        "linear_algebra",
-        "algorithms",
-    ),  # LA less directly prerequisite than Discrete Math
-    # --- Expected Low ---
-    ("recursion", "algorithms"),  # Reverse direction
-    ("algorithms", "discrete_math"),  # Reverse direction
-    ("complexity_theory", "algorithms"),  # Reverse direction
-    ("python_loops", "recursion"),
-    ("iteration_concepts", "recursion"),  # General iteration vs specific technique
-    # --- Expected Very Low (Unrelated) ---
-    ("art", "data_structures"),
-    ("art", "algorithms"),
-    ("art", "machine_learning"),
-    ("cooking", "intro_python"),
-    ("cooking", "algorithms"),
-    ("philosophy", "recursion"),
-    ("philosophy", "linear_algebra"),
-    # --- Expected Very Low (Related Domain, Wrong Direction/Link) ---
-    ("machine_learning", "linear_algebra"),  # Reverse direction
-    ("machine_learning", "intro_python"),  # Reverse direction
-    # --- Confusable Pairs ---
-    ("intro_python", "iteration_concepts"),  # Basic python vs general concept
-    ("python_loops", "python_syntax"),  # Specific loops vs general syntax
-    (
-        "algorithms",
-        "complexity_theory",
-    ),  # Analysis vs deeper theory (already an edge, check prob)
+    # --- Expected High (Clear Prereqs) ---
+    ("intro_python", "algorithms"),              # Need programming basics for algos
+    ("discrete_math", "data_structures"),      # Very common prereq
+    ("calculus", "linear_algebra"),            # Common math sequence
+
+    # --- Expected Medium/High (Strongly Related / Tool Usage) ---
+    ("data_structures", "machine_learning"),     # Should be reasonably high
+
+    # --- Expected Medium (Plausible but less direct) ---
+    ("classical_mechanics", "linear_algebra"), # LA used in advanced mechanics
+
+    # --- Expected Low (Reverse Directions) ---
+    ("algorithms", "data_structures"),
+    ("machine_learning", "statistics"),
+    ("evolution", "genetics"),                  # Using Evolution ID which is NOT in concepts - GOOD TEST CASE
+    ("classical_mechanics", "calculus"),
+
+    # --- Expected Very Low (Clearly Unrelated Domains) ---
+    ("ancient_greece", "calculus"),
+    ("impressionism", "intro_python"),
+    ("organic_chemistry", "data_structures"),
+    ("french_language", "machine_learning"),
+    ("music_theory", "algorithms"),
+    ("world_war_1", "genetics"),
+    ("macroeconomics", "molecular_biology"),
+
+    # --- Testing Tool Usage vs Domain Knowledge ---
+    ("intro_python", "statistics"),             # Python used for stats, but not a prereq for the theory
+    ("intro_python", "macroeconomics"),         # Python used for econ modeling, weak prereq link
 ]
 
 # --- Main Inference Execution ---
@@ -250,7 +164,7 @@ if __name__ == "__main__":
         device = torch.device("cpu")
     logging.info(f"Using device: {device}")
 
-    # 2. Process Custom Data (Same as infer.py)
+    # 2. Process Custom Data
     logging.info("Processing custom concept data...")
     custom_id_to_index = {concept["id"]: i for i, concept in enumerate(custom_concepts)}
     custom_index_to_id = {i: concept["id"] for i, concept in enumerate(custom_concepts)}

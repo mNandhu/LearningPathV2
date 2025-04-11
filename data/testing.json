@@ -1,0 +1,22 @@
+[
+    {"id": "intro_python", "name": "Python (programming language)", "text": "Insert wiki article on Python programming language here."},
+    {"id": "data_structures", "name": "Data structure", "text": "Insert wiki article on Data Structures here."},
+    {"id": "algorithms", "name": "Algorithm", "text": "Insert wiki article on Algorithms here."},
+    {"id": "calculus", "name": "Calculus", "text": "Insert wiki article on Calculus here."},
+    {"id": "linear_algebra", "name": "Linear algebra", "text": "Insert wiki article on Linear Algebra here."},
+    {"id": "discrete_math", "name": "Discrete mathematics", "text": "Insert wiki article on Discrete Mathematics here."},
+    {"id": "probability", "name": "Probability theory", "text": "Insert wiki article on Probability Theory here."},
+    {"id": "statistics", "name": "Statistics", "text": "Insert wiki article on Statistics here."},
+    {"id": "machine_learning", "name": "Machine learning", "text": "Insert wiki article on Machine Learning here."},
+    {"id": "classical_mechanics", "name": "Classical mechanics", "text": "Insert wiki article on Classical Mechanics here."},
+    {"id": "genetics", "name": "Genetics", "text": "Insert wiki article on Genetics here."},
+    {"id": "molecular_biology", "name": "Molecular Biology", "text": "Insert wiki article on Molecular Biology here."},
+    {"id": "world_war_1", "name": "World War I", "text": "Insert wiki article on World War I here."},
+    {"id": "ancient_greece", "name": "Ancient Greece", "text": "Insert wiki article on Ancient Greece here."},
+    {"id": "impressionism", "name": "Impressionism", "text": "Insert wiki article on Impressionism art movement here."},
+    {"id": "shakespeare", "name": "William Shakespeare", "text": "Insert wiki article on William Shakespeare here."},
+    {"id": "macroeconomics", "name": "Macroeconomics", "text": "Insert wiki article on Macroeconomics here."},
+    {"id": "organic_chemistry", "name": "Organic chemistry", "text": "Insert wiki article on Organic Chemistry here."},
+    {"id": "french_language", "name": "French language", "text": "Insert wiki article on the French language here."},
+    {"id": "music_theory", "name": "Music theory", "text": "Insert wiki article on Music Theory here."}
+]

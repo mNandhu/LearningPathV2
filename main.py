@@ -1,4 +1,3 @@
-# main.py
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -10,17 +9,9 @@ import random
 import time
 import logging
 import gc
-import os  # <-- Import os for path operations
+import os
+import utils.utils as utils
 
-
-try:
-    # If utils.py is in a 'utils' subdirectory:
-    import utils.utils as utils
-except ImportError:
-    print(
-        "ERROR: Could not import 'utils'. Make sure utils.py is in the correct location."
-    )
-    exit()
 
 ITER_FILE = "logs/iter.txt"
 if os.path.exists(ITER_FILE):
@@ -30,7 +21,7 @@ if os.path.exists(ITER_FILE):
         except ValueError:
             iter_num = 1
 else:
-    iter_num = 100
+    iter_num = 1
 
 with open(ITER_FILE, "w") as f:
     f.write(str(iter_num + 1))
@@ -66,14 +57,14 @@ WEIGHT_DECAY = 0.01  # <-- Using the adjusted WD from previous recommendation
 EPOCHS = 300
 SEED = 42
 VAL_RATIO = 0.1
-TEST_RATIO = 0.1
-EVAL_EVERY = 5
+TEST_RATIO = 0.2
+EVAL_EVERY = 2
 NEG_SAMPLING_RATIO = 1.0  # Ratio of negative edges to positive edges per epoch
 
 # Optimization & Stopping
 LR_SCHEDULER_FACTOR = 0.5  # Factor to reduce LR by
 LR_SCHEDULER_PATIENCE = 10  # Epochs to wait before reducing LR if no improvement
-EARLY_STOPPING_PATIENCE = 20  # Epochs to wait before stopping if no improvement
+EARLY_STOPPING_PATIENCE = 25  # Epochs to wait before stopping if no improvement
 EARLY_STOPPING_METRIC = "auc"  # Metric to monitor for scheduler/stopping ('auc' or 'loss') - AUC recommended for link prediction
 
 # --- Setup Logging ---
@@ -126,7 +117,6 @@ logging.info("--- Starting New Training Run ---")
 
 
 # --- Set Seed ---
-# (Seed setting remains the same)
 random.seed(SEED)
 np.random.seed(SEED)
 torch.manual_seed(SEED)
@@ -140,13 +130,12 @@ else:
 
 
 # --- Model Definitions ---
-# (GAT and LinkPredictor class definitions remain the same)
 class GAT(nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels, heads, dropout):
         super().__init__()
         self.dropout_rate = dropout
-        self.conv1 = GATConv(in_channels, hidden_channels, heads=heads, dropout=dropout)
-        self.conv2 = GATConv(
+        self.gat_conv1 = GATConv(in_channels, hidden_channels, heads=heads, dropout=dropout)
+        self.gat_conv2 = GATConv(
             hidden_channels * heads,
             out_channels,
             heads=1,
@@ -156,10 +145,10 @@ class GAT(nn.Module):
 
     def forward(self, x, edge_index):
         x = F.dropout(x, p=self.dropout_rate, training=self.training)
-        x = self.conv1(x, edge_index)
+        x = self.gat_conv1(x, edge_index)
         x = F.elu(x)
         x = F.dropout(x, p=self.dropout_rate, training=self.training)
-        x = self.conv2(x, edge_index)
+        x = self.gat_conv2(x, edge_index)
         return x
 
 
@@ -179,7 +168,6 @@ class LinkPredictor(nn.Module):
 
 
 # --- Training Epoch Function ---
-# (train_epoch function remains the same)
 def train_epoch(
     model, predictor, data, optimizer, criterion, device, neg_sampling_ratio
 ):
@@ -366,7 +354,6 @@ if __name__ == "__main__":
     )
 
     # 6. Training Loop
-    # (Training loop logic remains the same as your last version)
     logging.info(f"\n--- Starting Training for {EPOCHS} Epochs ---")
     logging.info(f"  Device: {device}")
     logging.info(f"  Optimizer: Adam (LR={LEARNING_RATE}, WD={WEIGHT_DECAY})")
@@ -397,7 +384,6 @@ if __name__ == "__main__":
             continue
 
         if epoch % EVAL_EVERY == 0 or epoch == 1 or epoch == EPOCHS:
-            # Pass data directly, tensors will be moved inside evaluate_model if needed (already moved above)
             val_metrics = utils.evaluate_model(
                 model,
                 predictor,
@@ -451,7 +437,7 @@ if __name__ == "__main__":
             if epochs_without_improvement >= EARLY_STOPPING_PATIENCE:
                 logging.info(
                     f"Early stopping triggered at epoch {epoch} after {epochs_without_improvement} evaluations without improvement."
-                )  # Corrected log message
+                )
                 break
         else:
             if epoch % (EVAL_EVERY * 2) == 0:
@@ -463,7 +449,6 @@ if __name__ == "__main__":
 
     total_time = time.time() - start_total_time
     logging.info("\n--- Training Finished ---")
-    # (Final logging and evaluation remain the same)
     logging.info(f"Total training time: {total_time:.2f}s")
     logging.info(
         f"Best Validation {EARLY_STOPPING_METRIC.upper()}: {best_val_metric:.4f} achieved at epoch {best_epoch}"
