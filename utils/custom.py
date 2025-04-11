@@ -36,7 +36,7 @@ class GATConv(nn.Module):
         x = x.view(N, self.heads, self.out_channels)  # [N, heads, out_channels]
 
         # edge_index: [2, E] with edge_index[0]=source, edge_index[1]=target
-        src, dst = edge_index
+        src, dst = edge_index[0], edge_index[1]
 
         # Prepare attention computation: for each edge we need [x_src || x_dst]
         x_src = x[src]  # [E, heads, out_channels]
@@ -46,7 +46,7 @@ class GATConv(nn.Module):
         alpha = (a_input * self.att).sum(dim=-1)  # [E, heads]
         alpha = F.leaky_relu(alpha, negative_slope=self.negative_slope)
         # Normalize by target node; softmax over all incoming edges per target
-        alpha = softmax(alpha, dst)
+        alpha = softmax(alpha, dst, num_nodes=N)
         alpha = F.dropout(alpha, p=self.dropout, training=self.training)
 
         # Message passing: aggregate neighbor features weighted by attention coefficients
